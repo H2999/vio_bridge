@@ -45,7 +45,7 @@ struct __attribute__((packed)) IMUPacket
   uint64_t strb_timestamp_us; // STRB信号到达的时刻
   uint16_t crc;
 };
-// 大小：2+8+8+12+12+1+1+8+2 = 54字节
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -72,12 +72,9 @@ volatile uint8_t current_buffer = 0;  // 当前正在写入的缓冲区索引
 volatile uint8_t data_ready = 0;      // 有新数据标志
 
 // 触发相关
-volatile uint8_t trigger_pulse_active = 0;
-volatile uint64_t pulse_start_time = 0;
 volatile uint32_t frame_counter = 0;  // 总帧数，一直累加
-
-// 触发相机频率控制（在中断里处理）
-static uint8_t capture_count = 0;
+volatile uint8_t trigger_pending = 0;
+volatile uint64_t trigger_timestamp_us = 0;
 
 // IMU 数据缓存（从 wrapper 获取）
 float accel_data[3];
@@ -122,22 +119,6 @@ void send_imu_packet(struct IMUPacket* packet)
   HAL_UART_Transmit_DMA(&huart1, byte_ptr, packet_size);
 }
 
-// 处理触发脉冲（在主循环中调用）
-void process_trigger_pulse(void)
-{
-  if (trigger_pulse_active) {
-    if (pulse_start_time == 0) {
-      pulse_start_time = dwt_get_timeline_us_wrapper();
-    }
-
-    uint64_t current_time = dwt_get_timeline_us_wrapper();
-    if ((current_time - pulse_start_time) >= 5000) {
-      HAL_GPIO_WritePin(TRIG_GPIO_Port, TRIG_Pin, GPIO_PIN_RESET);
-      trigger_pulse_active = 0;
-      pulse_start_time = 0;
-    }
-  }
-}
 /* USER CODE END 0 */
 
 /**
@@ -174,11 +155,15 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_I2C1_Init();
+  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init(72);  // 72MHz 系统时钟
-  // 启动定时器中断（200Hz）
+  // TIM1_CH4: PA11 输出 30 Hz、500 us 的硬件触发脉冲
+  HAL_TIM_Base_Start_IT(&htim1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+  // TIM2: 约 1 kHz 采集并打包 IMU 数据
   HAL_TIM_Base_Start_IT(&htim2);
   // 初始化 IMU（通过 wrapper）
   if (mpu6050_init_wrapper() != HAL_OK) {
@@ -199,7 +184,6 @@ int main(void)
 
       send_imu_packet(&packet_buffer[buffer_to_send]);
     }
-    process_trigger_pulse();
     HAL_Delay(1);
   }
   /* USER CODE END 3 */
@@ -262,6 +246,15 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+  if (htim->Instance == TIM1)
+  {
+    // TIM1 更新事件对应 PA11 PWM 周期起点
+    trigger_timestamp_us = DWT_GetTimeline_us();
+    trigger_pending = 1;
+    frame_counter++;
+    return;
+  }
+
   if (htim->Instance == TIM2)
   {
     uint8_t write_idx = current_buffer;
@@ -272,7 +265,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
     // 填充数据包
     pkt->timestamp_us = DWT_GetTimeline_us();      // IMU采样时间
-    pkt->frame_id = ++frame_counter;
+    pkt->frame_id = frame_counter;
     memcpy(pkt->acc, accel_data, sizeof(float) * 3);
     memcpy(pkt->gyro, gyro_data, sizeof(float) * 3);
 
@@ -289,14 +282,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       pkt->strb_flag = 0;
     }
 
-    // 原有的触发逻辑（每10次触发相机）
-    capture_count++;
-    if (capture_count >= 10)
+    if (trigger_pending)
     {
-      capture_count = 0;
       pkt->trigger_flag = 1;
-      HAL_GPIO_WritePin(TRIG_GPIO_Port, TRIG_Pin, GPIO_PIN_SET);
-      trigger_pulse_active = 1;
+      trigger_pending = 0;
     }
     else
     {

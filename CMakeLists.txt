@@ -34,8 +34,6 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/wrapper.cpp
-        Core/Inc/wrapper.h
-        Core/Inc/bsp_dwt.h
         Core/Src/bsp_dwt.c
         Device/imu/mpu6050.cpp
 )

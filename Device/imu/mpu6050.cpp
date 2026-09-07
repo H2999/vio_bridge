@@ -1,4 +1,4 @@
-#include "MPU6050.h"
+#include "mpu6050.h"
 
 uint8_t a = 10;
 

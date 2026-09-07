@@ -1,0 +1,5 @@
+/home/hzq/RM/stm32/vio_bridge/Core/Src/wrapper.cpp:11:30:HAL_StatusTypeDef mpu6050_init_wrapper()	8	static
+/home/hzq/RM/stm32/vio_bridge/Core/Src/wrapper.cpp:17:17:void mpu6050_get_data_wrapper(float*, float*)	24	static
+/home/hzq/RM/stm32/vio_bridge/Core/Src/wrapper.cpp:29:21:uint64_t dwt_get_timeline_us_wrapper()	8	static
+/home/hzq/RM/stm32/vio_bridge/Core/Src/wrapper.cpp:32:1:void __static_initialization_and_destruction_0(int, int)	16	static
+/home/hzq/RM/stm32/vio_bridge/Core/Src/wrapper.cpp:32:1:cpp)	8	static

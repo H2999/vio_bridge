@@ -16,6 +16,10 @@ extern "C" HAL_StatusTypeDef mpu6050_init_wrapper(void)
 // C 接口函数：获取 IMU 数据（返回指针，避免引用）
 extern "C" void mpu6050_get_data_wrapper(float* acc, float* gyro)
 {
+    // Refresh the cache before copying it to the application packet.
+    mpu.MPU6050_ReadRaw();
+    mpu.MPU6050_ReadData();
+
     const MPU6050::mpu6050_t& data = mpu.get_data();
     memcpy(acc, data.accel_final, sizeof(float) * 3);
     memcpy(gyro, data.gyro_final, sizeof(float) * 3);

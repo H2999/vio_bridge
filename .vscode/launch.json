@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug STM32",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceFolder}/build-arm/imu_config.elf",
+            "preLaunchTask": "build",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f1x.cfg"
+            ],
+            "interface": "swd",
+            "runToEntryPoint": "main",
+            "svdFile": "./STM32F103.svd",
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            },
+            "showDevDebugOutput": "raw",
+            "toolchainPrefix": "arm-none-eabi",
+            "gdbPath": "/usr/bin/gdb-multiarch"
+        }
+    ]
+}

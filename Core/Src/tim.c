@@ -27,6 +27,8 @@
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim1;
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle);
+
 void MX_TIM1_Init(void)
 {
   TIM_MasterConfigTypeDef master = {0};
@@ -62,6 +64,7 @@ void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
+  HAL_TIM_MspPostInit(&htim1);
 }
 
 /* TIM2 init function */

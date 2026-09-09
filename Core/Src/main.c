@@ -160,15 +160,31 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init(72);  // 72MHz 系统时钟
-  // TIM1_CH4: PA11 输出 30 Hz、500 us 的硬件触发脉冲
-  HAL_TIM_Base_Start_IT(&htim1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-  // TIM2: 约 1 kHz 采集并打包 IMU 数据
-  HAL_TIM_Base_Start_IT(&htim2);
-  // 初始化 IMU（通过 wrapper）
-  if (mpu6050_init_wrapper() != HAL_OK) {
-    return 0;
+
+  /*
+   * MPU6050 and the camera need a short power-up time. Do not start TIM1/TIM2
+   * before the IMU is ready, otherwise the host may receive stale IMU data
+   * while the camera trigger/STRB path is not yet stable.
+   */
+  HAL_Delay(200);
+  while (mpu6050_init_wrapper() != HAL_OK)
+  {
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+    HAL_Delay(200);
   }
+
+  /*
+   * Let the USB camera and driver settle before the first external trigger.
+   * This delay is before both trigger and IMU sampling start, so both streams
+   * still share the same STM32 timestamp origin.
+   */
+  HAL_Delay(2000);
+
+  // TIM1_CH4: PA11 输出 30 Hz、500 us 的硬件触发脉冲
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+  HAL_TIM_Base_Start_IT(&htim1);
+  // TIM2: 约 200 Hz 采集并打包 IMU 数据
+  HAL_TIM_Base_Start_IT(&htim2);
   /* USER CODE END 2 */
 
   /* Infinite loop */

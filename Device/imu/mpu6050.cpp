@@ -2,19 +2,23 @@
 
 uint8_t a = 10;
 
+namespace {
+constexpr uint32_t kI2cTimeoutMs = 20;
+}
+
 HAL_StatusTypeDef MPU6050::MPU6050_WriteReg(uint8_t reg, uint8_t data)
 {
-    return HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, &data, 1, HAL_MAX_DELAY);
+    return HAL_I2C_Mem_Write(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, &data, 1, kI2cTimeoutMs);
 }
 
 HAL_StatusTypeDef MPU6050::MPU6050_ReadReg(uint8_t reg, uint8_t *data)
 {
-    return HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, data, 1, HAL_MAX_DELAY);
+    return HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, data, 1, kI2cTimeoutMs);
 }
 
 HAL_StatusTypeDef MPU6050::MPU6050_ReadBytes(uint8_t reg, uint8_t *data, const uint8_t len)
 {
-    return HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, data, len, HAL_MAX_DELAY);
+    return HAL_I2C_Mem_Read(&hi2c1, MPU6050_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, data, len, kI2cTimeoutMs);
 }
 
 MPU6050 & MPU6050::getinstance()
@@ -27,27 +31,43 @@ HAL_StatusTypeDef MPU6050::MPU6050_Init()
 {
     uint8_t whoami = 0x00;
 
-    MPU6050_ReadReg(0x75, &whoami);
-    if (whoami != 0x68)
+    if (HAL_I2C_IsDeviceReady(&hi2c1, MPU6050_ADDRESS, 3, kI2cTimeoutMs) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
+
+    if (MPU6050_ReadReg(MPU6050_WHO_AM_I, &whoami) != HAL_OK || whoami != 0x68)
     {
         return HAL_ERROR;
     }
 
     // 唤醒芯片
-    MPU6050_WriteReg(0x6B, 0x00);
+    if (MPU6050_WriteReg(MPU6050_PWR_MGMT_1, 0x00) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
     HAL_Delay(10);
 
     // 3. 配置陀螺仪量程（寄存器 0x1B）
     // 0x00: ±250°/s, 0x08: ±500°/s, 0x10: ±1000°/s, 0x18: ±2000°/s
-    MPU6050_WriteReg(0x1B, 0x00);  // ±250°/s
+    if (MPU6050_WriteReg(MPU6050_GYRO_CONFIG, 0x00) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
 
     // 4. 配置加速度计量程（寄存器 0x1C）
     // 0x00: ±2g, 0x08: ±4g, 0x10: ±8g, 0x18: ±16g
-    MPU6050_WriteReg(0x1C,0x00);  // ±2g
+    if (MPU6050_WriteReg(MPU6050_ACCEL_CONFIG, 0x00) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
 
     // 5. 配置数字低通滤波器（寄存器 0x1A）
     // 0x00: 256Hz, 0x01: 188Hz, 0x02: 98Hz, 0x03: 42Hz, 0x04: 20Hz, 0x05: 10Hz
-    MPU6050_WriteReg(0x1A, 0x03);  // 42Hz
+    if (MPU6050_WriteReg(MPU6050_CONFIG, 0x03) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
 
     return HAL_OK;
 }
